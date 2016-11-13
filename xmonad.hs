@@ -20,6 +20,7 @@ import Control.Monad
 import Data.Foldable
 import Data.Function
 import GHC.Exts(IsString(..))
+import System.Exit
 
 --------------------------------------------------------------------------------
 
@@ -59,12 +60,15 @@ myManageHook = manageSpawn <+> (defaultConfig&manageHook)
 myKeys = customKeys delKeys addKeys
 
 delKeys XConfig{modMask} =
-   [ (modMask, xK_E)
+   [ hk [modMask] xK_E
+   , hk [modMask, shiftMask]  xK_q -- too easy to press
    ]
 
 addKeys XConfig{modMask} = -- TODO doesnt work
- [ (modMask, xK_E) -: bringApp myEditor
- , (modMask, xK_B) -: bringApp myBrowser
+ [ kb [modMask] xK_E $ bringApp myEditor
+ , hk [modMask] xK_B -: bringApp myBrowser
+ , hk [modMask, shiftMask, controlMask] xK_q -: quitXMonad
+ , hk [modMask] xK_C -: closeWindow
  ]
 
 {-
@@ -117,6 +121,20 @@ launchApp :: App -> [String] -> X()
 launchApp App{..} arguments = ifWindows (className =? appClassName) (const nothing) (safeSpawn appExecutable arguments)
 
 mapAppExecutable f app = app{appExecutable = f (app&appExecutable)}
+
+--------------------------------------------------------------------------------
+
+quitXMonad = io (exitWith ExitSuccess)
+
+closeWindow = kill
+
+masks = foldr (.|.) noModMask
+
+-- hotkey
+hk ms k = (masks ms, k)
+
+-- keybinding
+kb ms k a = hk ms k -: a
 
 --------------------------------------------------------------------------------
 

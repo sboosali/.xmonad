@@ -82,10 +82,15 @@ addKeys XConfig{modMask} = -- TODO doesnt work
 
  , hk [] xK_F5  -: undo
   
- , hk [] xK_F7  -: maxVolume 
- , hk [] xK_F8  -: muteVolume
- , hk [] xK_F9  -: decreaseVolume
- , hk [] xK_F10 -: increaseVolume
+ , hk [] xK_F7  -: muteVolume
+ , hk [] xK_F8  -: decreaseVolume
+ , hk [] xK_F9  -: increaseVolume
+ , hk [modMask] xK_F9 -: maxVolume 
+
+ , hk [] xK_F10 -: redBrightness
+ , hk [] xK_F11 -: decreaseBrightness
+ , hk [] xK_F12 -: increaseBrightness 
+ , hk [modMask] xK_F12 -: maxBrightness
 
  -- -- "S-x" like "M-x"
  -- , hk [modMask] xK_x -: do
@@ -116,6 +121,17 @@ increaseVolume = raiseVolume 5 >> nothing
 -- muteVolume     = spawn "amixer set Master toggle"
 -- decreaseVolume = spawn "amixer set Master -5%"
 -- increaseVolume = spawn "amixer set Master +5%"
+
+maxBrightness      = spawn "xbrightness 65535"
+redBrightness      = spawn "xbrightness +0 0 0"
+decreaseBrightness = spawn "xbrightness -10000"
+increaseBrightness = spawn "xbrightness +10000"
+
+-- getBrightness = spawn "xbrightness "
+-- setBrightness = spawn "xbrightness "
+
+-- echo 250 | sudo tee /sys/class/backlight/intel_backlight/brightness
+-- cat /sys/class/backlight/intel_backlight/max_brightness
 
 undo = sendKey controlMask xK_z
 

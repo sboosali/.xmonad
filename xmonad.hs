@@ -1,12 +1,14 @@
 {-# LANGUAGE LambdaCase, RecordWildCards, NamedFieldPuns, OverloadedStrings #-}
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable #-}
 -- {-# LANGUAGE OverloadedLists #-}
-import XMonad 
+import XMonad
+import qualified XMonad.Core as X                     --
+import qualified XMonad.StackSet as X                 --
 import XMonad.Util.EZConfig                           --
 import XMonad.Util.CustomKeys                         -- 
 import XMonad.Util.Run                                -- 
 import XMonad.Actions.SpawnOn                         -- 
-import XMonad.Util.ExtensibleState                    -- 
+import XMonad.Util.ExtensibleState hiding (gets)                   -- 
 import qualified XMonad.Util.ExtensibleState as XS    -- 
 import XMonad.Actions.WindowGo                        --
 import XMonad.Actions.Volume
@@ -74,9 +76,12 @@ addKeys XConfig{modMask} = -- TODO doesnt work
  [ hk [modMask, shiftMask, controlMask] xK_q -: quitXMonad
  , hk [modMask] xK_c -: closeWindow
 
- , kb [modMask] xK_e $ bringApp myEditor
+ , hk [modMask] xK_e -: bringApp myEditor
  , hk [modMask] xK_b -: bringApp myBrowser
- 
+ , hk [modMask] xK_s -: bringApp myTerminal -- "s"hell
+
+ , hk [] xK_F5  -: undo
+  
  , hk [] xK_F7  -: maxVolume 
  , hk [] xK_F8  -: muteVolume
  , hk [] xK_F9  -: decreaseVolume
@@ -86,8 +91,8 @@ addKeys XConfig{modMask} = -- TODO doesnt work
  -- , hk [modMask] xK_x -: do
  --     inputPrompt defaultXPConfig ">" >>= flip whenJust (evalExpression defaultEvalConfig)
 
- -- , hk [] xK_Insert -: xCopy
- -- , hk [] xK_Print  -: xPaste
+ , hk [] xK_Print  -: xCopy
+ , hk [] xK_Insert -: xPaste
 -- , hk [] xK_ -: do
  -- xK_Pause
  -- xK_Escape
@@ -112,9 +117,24 @@ increaseVolume = raiseVolume 5 >> nothing
 -- decreaseVolume = spawn "amixer set Master -5%"
 -- increaseVolume = spawn "amixer set Master +5%"
 
+undo = sendKey controlMask xK_z
+
+xCopy = sendKey controlMask xK_c
 -- xCopy  = do
---   s <- getSelection
---   spawn $ "echo " ++ s ++ " | xclip"
+--  s <- getSelection
+--  spawn $ "echo " ++ s ++ " | xclip"
+
+xPaste = do
+  ws <- gets windowset
+  case X.peek ws of
+    Just w -> do
+      isTerminal <- runQuery (className =? (myTerminal&appClassName)) w
+      case isTerminal of
+        True  -> sendKey shiftMask   xK_Insert
+        False -> sendKey controlMask xK_v
+    Nothing -> nothing
+
+-- xPaste = sendKey controlMask xK_v
 -- xPaste = pasteSelection
 -- xPaste = do
 --   -- TODO spawn ""
@@ -123,7 +143,7 @@ increaseVolume = raiseVolume 5 >> nothing
 
 -- execQuery = do
 --   flip runQuery
-  
+
 --------------------------------------------------------------------------------
 
 --TODO state reset on reload

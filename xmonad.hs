@@ -1,21 +1,29 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable #-}
 -- {-# LANGUAGE OverloadedLists #-}
 import XMonad 
 import XMonad.Util.EZConfig 
 import XMonad.Actions.SpawnOn
+import XMonad.Util.ExtensibleState
+import qualified XMonad.Util.ExtensibleState as XS
+import XMonad.Actions.WindowGo --
 -- import XMonad.Actions. -- 
 -- import XMonad.Actions.GridSelect -- show all windows in grid, focus by clicking
 -- import XMonad.Actions.CopyWindow -- fake menubar, i.e. same window with constant location in each workspace
 
 import qualified Data.Map as M
 import Control.Applicative
+import Control.Monad
 import Data.Foldable
+import Data.Function
+
+--------------------------------------------------------------------------------
 
 main = xmonad myConfig
 
 myConfig = defaultConfig
  { modMask = mod4Mask  -- super instead of alt (usually Windows key)
- , terminal = "xterm"
+ , terminal = myTerminal&appExecutable
  , clickJustFocuses = False
  , focusFollowsMouse = False
  , manageHook = myManageHook
@@ -24,19 +32,21 @@ myConfig = defaultConfig
  , keys = myKeys
  }
 
--- called on (re/)loading
-myStartupHook = do
-  traverse_ (spawnOn "1")
-    [ terminal myConfig
-    -- , "chromium"
-    -- , "emacs"
-    ]
+myWorkspaces = show <$> [1..3]
+
+myTerminal = App "xterm" "XTerm"
+-- terminal myConfig
+
+myBrowser = App "chromium" "chromium-browser"
+
+myEditor = App "emacs" "Emacs" 
+
+--------------------------------------------------------------------------------
 
 -- called on new window
 myManageHook = manageSpawn <+> manageHook defaultConfig
 
-myWorkspaces = show <$> [1..3]
-
+--------------------------------------------------------------------------------
 myKeys = newKeys <+> keys defaultConfig
 
 newKeys XConfig{modMask} = M.fromList []
@@ -45,6 +55,50 @@ newKeys XConfig{modMask} = M.fromList []
  -- ]
     
 -- http://hackage.haskell.org/packages/archive/X11/latest/doc/html/Graphics-X11-Types.html
+
+--------------------------------------------------------------------------------
+
+--TODO state reset on reload
+data MyState = MyState {sIsReload :: Bool } deriving (Typeable,Show,Read)
+instance ExtensionClass MyState where
+   initialValue = MyState False
+
+myStartupHook = onReload
+
+-- first load and every reload
+onReload = do
+  -- only run start up hook the first time (ie not after reloading)
+  unlessM (sIsReload <$> XS.get) $ do
+    XS.modify $ (\c -> c{sIsReload = True})
+    onLoad
+
+-- first load only
+onLoad = do
+  -- traverse_ (spawnOn "1")
+  traverse_ bring
+    [ myTerminal
+    , myBrowser
+    , myEditor -- " ~/.xmonad/xmonad.hs"
+    ]
+
+--------------------------------------------------------------------------------
+
+data App = App
+  { appExecutable :: String
+  , appClassName :: String
+  }
+
+bring :: App -> X()
+bring App{..} = runOrRaise appExecutable (className =? appClassName)
+
+--------------------------------------------------------------------------------
+
+(-:) = (,)
+
+unlessM :: Monad m => m Bool -> m () -> m ()
+unlessM b s = b >>= (\t -> unless t s)
+
+--------------------------------------------------------------------------------
 
 {-
 

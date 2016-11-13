@@ -1,21 +1,25 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
+{-# LANGUAGE LambdaCase, RecordWildCards, NamedFieldPuns, OverloadedStrings #-}
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable #-}
 -- {-# LANGUAGE OverloadedLists #-}
 import XMonad 
-import XMonad.Util.EZConfig 
-import XMonad.Actions.SpawnOn
-import XMonad.Util.ExtensibleState
-import qualified XMonad.Util.ExtensibleState as XS
-import XMonad.Actions.WindowGo --
--- import XMonad.Actions. -- 
+import XMonad.Util.EZConfig                           --
+import XMonad.Util.CustomKeys                         -- 
+import XMonad.Util.Run                                -- 
+import XMonad.Actions.SpawnOn                         -- 
+import XMonad.Util.ExtensibleState                    -- 
+import qualified XMonad.Util.ExtensibleState as XS    -- 
+import XMonad.Actions.WindowGo                        -- 
+-- import XMonad.Layout.ResizableTile -- for vertical resizing
 -- import XMonad.Actions.GridSelect -- show all windows in grid, focus by clicking
 -- import XMonad.Actions.CopyWindow -- fake menubar, i.e. same window with constant location in each workspace
+-- import XMonad.Actions.                          -- 
 
 import qualified Data.Map as M
 import Control.Applicative
 import Control.Monad
 import Data.Foldable
 import Data.Function
+import GHC.Exts(IsString(..))
 
 --------------------------------------------------------------------------------
 
@@ -34,6 +38,10 @@ myConfig = defaultConfig
 
 myWorkspaces = show <$> [1..3]
 
+--------------------------------------------------------------------------------
+-- apps
+-- find `className`s via `xprop | grep CLASS`
+
 myTerminal = App "xterm" "XTerm"
 -- terminal myConfig
 
@@ -44,16 +52,29 @@ myEditor = App "emacs" "Emacs"
 --------------------------------------------------------------------------------
 
 -- called on new window
-myManageHook = manageSpawn <+> manageHook defaultConfig
+myManageHook = manageSpawn <+> (defaultConfig&manageHook)
 
 --------------------------------------------------------------------------------
-myKeys = newKeys <+> keys defaultConfig
 
-newKeys XConfig{modMask} = M.fromList []
- -- [ ((modMask, xK_F12), xmonadPrompt defaultXPConfig)          
- -- , ((modMask, xK_F3 ), shellPrompt  defaultXPConfig)
- -- ]
-    
+myKeys = customKeys delKeys addKeys
+
+delKeys XConfig{modMask} =
+   [ (modMask, xK_E)
+   ]
+
+addKeys XConfig{modMask} = -- TODO doesnt work
+ [ (modMask, xK_E) -: bringApp myEditor
+ , (modMask, xK_B) -: bringApp myBrowser
+ ]
+
+{-
+myKeys = newKeys <+> (defaultConfig&keys)
+newKeys XConfig{modMask} = M.fromList
+ [ (modMask, xK_E) -: bringApp myEditor
+ , (modMask, xK_B) -: bringApp myBrowser
+ ]
+-}
+
 -- http://hackage.haskell.org/packages/archive/X11/latest/doc/html/Graphics-X11-Types.html
 
 --------------------------------------------------------------------------------
@@ -75,10 +96,10 @@ onReload = do
 -- first load only
 onLoad = do
   -- traverse_ (spawnOn "1")
-  traverse_ bring
-    [ myTerminal
-    , myBrowser
-    , myEditor -- " ~/.xmonad/xmonad.hs"
+  traverse_ (launchApp&uncurry) 
+    [ myTerminal -: []
+    , myBrowser  -: []
+    , myEditor   -: ["~/.xmonad/xmonad.hs"]
     ]
 
 --------------------------------------------------------------------------------
@@ -88,12 +109,25 @@ data App = App
   , appClassName :: String
   }
 
-bring :: App -> X()
-bring App{..} = runOrRaise appExecutable (className =? appClassName)
+bringApp :: App -> X()
+bringApp App{..} = runOrRaise appExecutable (className =? appClassName)
+
+-- does nothing if the window exists
+launchApp :: App -> [String] -> X()
+launchApp App{..} arguments = ifWindows (className =? appClassName) (const nothing) (safeSpawn appExecutable arguments)
+
+mapAppExecutable f app = app{appExecutable = f (app&appExecutable)}
 
 --------------------------------------------------------------------------------
 
 (-:) = (,)
+
+nothing = return()
+
+filterBlanks :: (IsString k, Eq k) => [(k,v)] -> [(k,v)]
+filterBlanks = filter $ \case
+ ("",_) -> False
+ (_, _) -> True
 
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM b s = b >>= (\t -> unless t s)
@@ -101,6 +135,9 @@ unlessM b s = b >>= (\t -> unless t s)
 --------------------------------------------------------------------------------
 
 {-
+
+
+XMonad.Layout.ResizableTile
 
 
 http://xmonad.org/xmonad-docs/xmonad-contrib/XMonad-Hooks-ServerMode.html

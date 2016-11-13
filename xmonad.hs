@@ -8,7 +8,13 @@ import XMonad.Util.Run                                --
 import XMonad.Actions.SpawnOn                         -- 
 import XMonad.Util.ExtensibleState                    -- 
 import qualified XMonad.Util.ExtensibleState as XS    -- 
-import XMonad.Actions.WindowGo                        -- 
+import XMonad.Actions.WindowGo                        --
+import XMonad.Actions.Volume
+import Graphics.X11.ExtraTypes.XF86
+import XMonad.Util.XSelection                         -- copy
+import XMonad.Util.Paste                              -- paste
+-- import XMonad.Prompt.Input
+-- import XMonad.Actions.Eval
 -- import XMonad.Layout.ResizableTile -- for vertical resizing
 -- import XMonad.Actions.GridSelect -- show all windows in grid, focus by clicking
 -- import XMonad.Actions.CopyWindow -- fake menubar, i.e. same window with constant location in each workspace
@@ -56,19 +62,35 @@ myEditor = App "emacs" "Emacs"
 myManageHook = manageSpawn <+> (defaultConfig&manageHook)
 
 --------------------------------------------------------------------------------
+-- find values of keys via `xev`
 
 myKeys = customKeys delKeys addKeys
 
 delKeys XConfig{modMask} =
-   [ hk [modMask] xK_E
-   , hk [modMask, shiftMask]  xK_q -- too easy to press
+   [ hk [modMask, shiftMask]  xK_q -- too easy to press
    ]
 
 addKeys XConfig{modMask} = -- TODO doesnt work
- [ kb [modMask] xK_E $ bringApp myEditor
- , hk [modMask] xK_B -: bringApp myBrowser
- , hk [modMask, shiftMask, controlMask] xK_q -: quitXMonad
- , hk [modMask] xK_C -: closeWindow
+ [ hk [modMask, shiftMask, controlMask] xK_q -: quitXMonad
+ , hk [modMask] xK_c -: closeWindow
+
+ , kb [modMask] xK_e $ bringApp myEditor
+ , hk [modMask] xK_b -: bringApp myBrowser
+ 
+ , hk [] xK_F7  -: maxVolume 
+ , hk [] xK_F8  -: muteVolume
+ , hk [] xK_F9  -: decreaseVolume
+ , hk [] xK_F10 -: increaseVolume
+
+ -- -- "S-x" like "M-x"
+ -- , hk [modMask] xK_x -: do
+ --     inputPrompt defaultXPConfig ">" >>= flip whenJust (evalExpression defaultEvalConfig)
+
+ -- , hk [] xK_Insert -: xCopy
+ -- , hk [] xK_Print  -: xPaste
+-- , hk [] xK_ -: do
+ -- xK_Pause
+ -- xK_Escape
  ]
 
 {-
@@ -81,6 +103,27 @@ newKeys XConfig{modMask} = M.fromList
 
 -- http://hackage.haskell.org/packages/archive/X11/latest/doc/html/Graphics-X11-Types.html
 
+maxVolume      = setVolume 100
+muteVolume     = toggleMute >> nothing
+decreaseVolume = lowerVolume 5 >> nothing
+increaseVolume = raiseVolume 5 >> nothing
+
+-- muteVolume     = spawn "amixer set Master toggle"
+-- decreaseVolume = spawn "amixer set Master -5%"
+-- increaseVolume = spawn "amixer set Master +5%"
+
+-- xCopy  = do
+--   s <- getSelection
+--   spawn $ "echo " ++ s ++ " | xclip"
+-- xPaste = pasteSelection
+-- xPaste = do
+--   -- TODO spawn ""
+--   className =? (myTerminal&appClassName)
+--   sendKey controlMask xK_v
+
+-- execQuery = do
+--   flip runQuery
+  
 --------------------------------------------------------------------------------
 
 --TODO state reset on reload

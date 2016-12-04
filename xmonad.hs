@@ -15,6 +15,8 @@ import XMonad.Actions.Volume
 import Graphics.X11.ExtraTypes.XF86
 import XMonad.Util.XSelection                         -- copy
 import XMonad.Util.Paste                              -- paste
+import XMonad.Prompt                                  -- 
+import qualified XMonad.Prompt.AppLauncher as AL                -- 
 -- import XMonad.Prompt.Input
 -- import XMonad.Actions.Eval
 -- import XMonad.Layout.ResizableTile -- for vertical resizing
@@ -51,7 +53,8 @@ myWorkspaces = show <$> [1..3]
 -- apps
 -- find `className`s via `xprop | grep CLASS`
 
-myTerminal = App "xterm" "XTerm"
+--myTerminal = App "xterm" "XTerm"
+myTerminal = App "terminator" ".terminator-wrapped"
 -- terminal myConfig
 
 myBrowser = App "chromium" "chromium-browser"
@@ -78,8 +81,8 @@ addKeys XConfig{modMask} = -- TODO doesnt work
 
  , hk [modMask] xK_e -: bringApp myEditor
  , hk [modMask] xK_b -: bringApp myBrowser
- , hk [modMask] xK_s -: bringApp myTerminal -- "s"hell
-
+ , hk [modMask] xK_s -: bringApp myTerminal -- "s"hell --TODO emacsclient, eshell in frame
+ 
  , hk [] xK_F5  -: undo
   
  , hk [] xK_F7  -: muteVolume
@@ -88,6 +91,7 @@ addKeys XConfig{modMask} = -- TODO doesnt work
  , hk [modMask] xK_F9 -: maxVolume 
 
  , hk [] xK_F10 -: redBrightness
+ , hk [modMask] xK_F10 -: warmBrightness
  , hk [] xK_F11 -: decreaseBrightness
  , hk [] xK_F12 -: increaseBrightness 
  , hk [modMask] xK_F12 -: maxBrightness
@@ -98,7 +102,11 @@ addKeys XConfig{modMask} = -- TODO doesnt work
 
  , hk [] xK_Print  -: xCopy
  , hk [] xK_Insert -: xPaste
--- , hk [] xK_ -: do
+
+ , hk [modMask] xK_r -: onLoad -- "r"eload
+ , ((modMask, xK_g), AL.launchApp defaultXPConfig "")
+
+ -- , hk [] xK_ -: do
  -- xK_Pause
  -- xK_Escape
  ]
@@ -122,8 +130,10 @@ increaseVolume = raiseVolume 5 >> nothing
 -- decreaseVolume = spawn "amixer set Master -5%"
 -- increaseVolume = spawn "amixer set Master +5%"
 
+-- 65535 = (2^16)-1
 maxBrightness      = spawn "xbrightness 65535"
 redBrightness      = spawn "xbrightness +0 0 0"
+warmBrightness     = spawn "xbrightness 65535 31234 31234"
 decreaseBrightness = spawn "xbrightness -10000"
 increaseBrightness = spawn "xbrightness +10000"
 
@@ -135,7 +145,16 @@ increaseBrightness = spawn "xbrightness +10000"
 
 undo = sendKey controlMask xK_z
 
-xCopy = sendKey controlMask xK_c
+xCopy = do
+  ws <- gets windowset
+  case X.peek ws of
+    Just w -> do
+      isTerminal <- runQuery (className =? (myTerminal&appClassName)) w
+      case isTerminal of
+        True  -> press [controlMask,shiftMask] xK_c
+        False -> press [controlMask          ] xK_c
+    Nothing -> nothing
+-- xCopy = sendKey controlMask xK_c
 -- xCopy  = do
 --  s <- getSelection
 --  spawn $ "echo " ++ s ++ " | xclip"
@@ -146,8 +165,8 @@ xPaste = do
     Just w -> do
       isTerminal <- runQuery (className =? (myTerminal&appClassName)) w
       case isTerminal of
-        True  -> sendKey shiftMask   xK_Insert
-        False -> sendKey controlMask xK_v
+        True  -> press [controlMask,shiftMask] xK_v
+        False -> press [controlMask          ] xK_v
     Nothing -> nothing
 
 -- xPaste = sendKey controlMask xK_v
@@ -160,20 +179,33 @@ xPaste = do
 -- execQuery = do
 --   flip runQuery
 
+xmsg s = safeSpawn "xmessage" ["-default", "okay", s] 
+
+-- Ram / CPU / disk / power
+-- free -g
+-- 
+-- df -h --output=pcent / | tail -1
+-- acpi -b | grep -P -o '[0-9]+(?=%)'
+
+-- date
+
+-- htop
+
+
 --------------------------------------------------------------------------------
 
 --TODO state reset on reload
-data MyState = MyState {sIsReload :: Bool } deriving (Typeable,Show,Read)
-instance ExtensionClass MyState where
-   initialValue = MyState False
+-- data MyState = MyState {sIsReload :: Bool } deriving (Typeable,Show,Read)
+-- instance ExtensionClass MyState where
+--    initialValue = MyState False
 
 myStartupHook = onReload
 
 -- first load and every reload
 onReload = do
   -- only run start up hook the first time (ie not after reloading)
-  unlessM (sIsReload <$> XS.get) $ do
-    XS.modify $ (\c -> c{sIsReload = True})
+  -- unlessM (sIsReload <$> XS.get) $ do
+  --   XS.modify $ (\c -> c{sIsReload = True})
     onLoad
 
 -- first load only
@@ -203,6 +235,8 @@ mapAppExecutable f app = app{appExecutable = f (app&appExecutable)}
 
 --------------------------------------------------------------------------------
 
+press ms k = sendKey&uncurry $ hk ms k
+
 quitXMonad = io (exitWith ExitSuccess)
 
 closeWindow = kill
@@ -214,6 +248,7 @@ hk ms k = (masks ms, k)
 
 -- keybinding
 kb ms k a = hk ms k -: a
+
 
 --------------------------------------------------------------------------------
 
